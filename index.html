@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Социальная сеть - Telegram Mini App</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function SocialApp() {
+            const [posts, setPosts] = useState([
+                { id: 1, author: 'Вы', text: 'Мой первый пост в Telegram!', likes: 0, time: '5 мин назад', comments: [] },
+                { id: 2, author: 'Друг', text: 'Круто! Это работает прямо в Telegram!', likes: 3, time: '10 мин назад', comments: [
+                    { id: 1, author: 'Вы', text: 'Да, очень удобно!' }
+                ] }
+            ]);
+            
+            const [newPost, setNewPost] = useState('');
+            const [username, setUsername] = useState('');
+            const [showComments, setShowComments] = useState({});
+            const [newComment, setNewComment] = useState({});
+
+            // Инициализация Telegram Web App
+            useEffect(() => {
+                if (window.Telegram?.WebApp) {
+                    const tg = window.Telegram.WebApp;
+                    tg.ready();
+                    tg.expand();
+                    
+                    // Получаем имя пользователя из Telegram
+                    const telegramUser = tg.initDataUnsafe?.user;
+                    if (telegramUser) {
+                        const displayName = telegramUser.first_name + 
+                            (telegramUser.last_name ? ' ' + telegramUser.last_name : '');
+                        setUsername(displayName);
+                    } else {
+                        setUsername('Telegram User');
+                    }
+
+                    // Настраиваем тему
+                    document.body.style.backgroundColor = tg.themeParams.bg_color || '#ffffff';
+                    document.body.style.color = tg.themeParams.text_color || '#000000';
+                }
+            }, []);
+
+            const addPost = () => {
+                if (newPost.trim() && newPost.length <= 280) {
+                    const post = {
+                        id: posts.length + 1,
+                        author: username,
+                        text: newPost,
+                        likes: 0,
+                        time: 'только что',
+                        comments: []
+                    };
+                    setPosts([post, ...posts]);
+                    setNewPost('');
+                    
+                    // Уведомление в Telegram
+                    if (window.Telegram?.WebApp) {
+                        window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                    }
+                }
+            };
+
+            const deletePost = (id) => {
+                setPosts(posts.filter(post => post.id !== id));
+                if (window.Telegram?.WebApp) {
+                    window.Telegram.WebApp.HapticFeedback.notificationOccurred('warning');
+                }
+            };
+
+            const likePost = (id) => {
+                setPosts(posts.map(post => 
+                    post.id === id ? { ...post, likes: post.likes + 1 } : post
+                ));
+                if (window.Telegram?.WebApp) {
+                    window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+                }
+            };
+
+            const toggleComments = (postId) => {
+                setShowComments(prev => ({
+                    ...prev,
+                    [postId]: !prev[postId]
+                }));
+            };
+
+            const addComment = (postId) => {
+                const commentText = newComment[postId];
+                if (commentText && commentText.trim()) {
+                    setPosts(posts.map(post => {
+                        if (post.id === postId) {
+                            return {
+                                ...post,
+                                comments: [...post.comments, {
+                                    id: post.comments.length + 1,
+                                    author: username,
+                                    text: commentText
+                                }]
+                            };
+                        }
+                        return post;
+                    }));
+                    setNewComment(prev => ({ ...prev, [postId]: '' }));
+                    
+                    if (window.Telegram?.WebApp) {
+                        window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                    }
+                }
+            };
+
+            return (
+                <div className="max-w-md mx-auto min-h-screen" style={{backgroundColor: 'var(--tg-theme-bg-color, #ffffff)'}}>
+                    {/* Заголовок приложения */}
+                    <div className="p-4 text-center" style={{backgroundColor: 'var(--tg-theme-button-color, #2481cc)', color: 'var(--tg-theme-button-text-color, #ffffff)'}}>
+                        <h1 className="text-xl font-bold">📱 Социальная сеть в Telegram</h1>
+                        <p className="text-sm opacity-90">Привет, {username}!</p>
+                    </div>
+
+                    {/* Форма создания поста */}
+                    <div className="p-4 border-b" style={{backgroundColor: 'var(--tg-theme-secondary-bg-color, #f1f1f1)'}}>
+                        <div className="flex gap-2">
+                            <div className="flex-1">
+                                <textarea
+                                    placeholder="Что нового в Telegram?"
+                                    value={newPost}
+                                    onChange={(e) => setNewPost(e.target.value)}
+                                    className="w-full p-3 border rounded-lg resize-none"
+                                    style={{backgroundColor: 'var(--tg-theme-bg-color, #ffffff)', color: 'var(--tg-theme-text-color, #000000)', borderColor: 'var(--tg-theme-hint-color, #999999)'}}
+                                    rows="2"
+                                    maxLength="280"
+                                />
+                                <div className="text-xs mt-1" style={{color: 'var(--tg-theme-hint-color, #999999)'}}>
+                                    {newPost.length}/280 символов
+                                    {newPost.length > 250 && (
+                                        <span className="text-red-500 ml-2">Осталось мало места!</span>
+                                    )}
+                                </div>
+                            </div>
+                            <button
+                                onClick={addPost}
+                                disabled={!newPost.trim() || newPost.length > 280}
+                                className="px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                style={{
+                                    backgroundColor: 'var(--tg-theme-button-color, #2481cc)', 
+                                    color: 'var(--tg-theme-button-text-color, #ffffff)'
+                                }}
+                            >
+                                Пост
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Лента постов */}
+                    <div className="p-4">
+                        <h2 className="text-lg font-semibold mb-4" style={{color: 'var(--tg-theme-text-color, #000000)'}}>
+                            📝 Лента новостей
+                        </h2>
+                        
+                        {posts.map(post => (
+                            <div key={post.id} className="border rounded-lg p-4 mb-3 shadow-sm" style={{backgroundColor: 'var(--tg-theme-bg-color, #ffffff)', borderColor: 'var(--tg-theme-hint-color, #999999)'}}>
+                                {/* Информация об авторе */}
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center">
+                                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold" style={{backgroundColor: 'var(--tg-theme-button-color, #2481cc)'}}>
+                                            {post.author[0].toUpperCase()}
+                                        </div>
+                                        <div className="ml-3">
+                                            <div className="font-semibold text-sm" style={{color: 'var(--tg-theme-text-color, #000000)'}}>{post.author}</div>
+                                            <div className="text-xs" style={{color: 'var(--tg-theme-hint-color, #999999)'}}>{post.time}</div>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Кнопка удаления поста */}
+                                    {post.author === username && (
+                                        <button
+                                            onClick={() => deletePost(post.id)}
+                                            className="hover:text-red-500 transition-colors"
+                                            style={{color: 'var(--tg-theme-hint-color, #999999)'}}
+                                            title="Удалить пост"
+                                        >
+                                            <span className="text-lg">🗑️</span>
+                                        </button>
+                                    )}
+                                </div>
+                                
+                                {/* Текст поста */}
+                                <div className="mb-3 leading-relaxed" style={{color: 'var(--tg-theme-text-color, #000000)'}}>
+                                    {post.text}
+                                </div>
+                                
+                                {/* Кнопки взаимодействия */}
+                                <div className="flex items-center justify-between pt-2 border-t" style={{borderColor: 'var(--tg-theme-hint-color, #e5e5e5)'}}>
+                                    <button
+                                        onClick={() => likePost(post.id)}
+                                        className="flex items-center gap-1 transition-colors"
+                                        style={{color: 'var(--tg-theme-hint-color, #999999)'}}
+                                    >
+                                        <span className="text-lg">❤️</span>
+                                        <span className="text-sm">{post.likes}</span>
+                                    </button>
+                                    
+                                    <button
+                                        onClick={() => toggleComments(post.id)}
+                                        className="flex items-center gap-1 transition-colors"
+                                        style={{color: 'var(--tg-theme-hint-color, #999999)'}}
+                                    >
+                                        <span className="text-lg">💬</span>
+                                        <span className="text-sm">
+                                            {post.comments.length > 0 ? `${post.comments.length}` : 'Комментарий'}
+                                        </span>
+                                    </button>
+                                    
+                                    <button 
+                                        className="flex items-center gap-1 transition-colors"
+                                        style={{color: 'var(--tg-theme-hint-color, #999999)'}}
+                                        onClick={() => {
+                                            if (window.Telegram?.WebApp) {
+                                                window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
+                                            }
+                                        }}
+                                    >
+                                        <span className="text-lg">📤</span>
+                                        <span className="text-sm">Поделиться</span>
+                                    </button>
+                                </div>
+                                
+                                {/* Раздел комментариев */}
+                                {showComments[post.id] && (
+                                    <div className="mt-3 pt-3 border-t" style={{borderColor: 'var(--tg-theme-hint-color, #e5e5e5)'}}>
+                                        {/* Форма добавления комментария */}
+                                        <div className="flex gap-2 mb-3">
+                                            <input
+                                                type="text"
+                                                placeholder="Написать комментарий..."
+                                                value={newComment[post.id] || ''}
+                                                onChange={(e) => setNewComment(prev => ({
+                                                    ...prev,
+                                                    [post.id]: e.target.value
+                                                }))}
+                                                className="flex-1 p-2 border rounded-lg text-sm"
+                                                style={{backgroundColor: 'var(--tg-theme-bg-color, #ffffff)', color: 'var(--tg-theme-text-color, #000000)', borderColor: 'var(--tg-theme-hint-color, #999999)'}}
+                                                onKeyPress={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        addComment(post.id);
+                                                    }
+                                                }}
+                                            />
+                                            <button
+                                                onClick={() => addComment(post.id)}
+                                                className="px-3 py-1 rounded-lg text-sm"
+                                                style={{backgroundColor: 'var(--tg-theme-button-color, #2481cc)', color: 'var(--tg-theme-button-text-color, #ffffff)'}}
+                                            >
+                                                ➤
+                                            </button>
+                                        </div>
+                                        
+                                        {/* Список комментариев */}
+                                        {post.comments.map(comment => (
+                                            <div key={comment.id} className="flex items-start gap-2 mb-2 p-2 rounded-lg" style={{backgroundColor: 'var(--tg-theme-secondary-bg-color, #f1f1f1)'}}>
+                                                <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                                                    {comment.author[0].toUpperCase()}
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="font-semibold text-xs" style={{color: 'var(--tg-theme-text-color, #000000)'}}>{comment.author}</div>
+                                                    <div className="text-sm" style={{color: 'var(--tg-theme-text-color, #000000)'}}>{comment.text}</div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        
+                                        {post.comments.length === 0 && (
+                                            <div className="text-center text-sm py-2" style={{color: 'var(--tg-theme-hint-color, #999999)'}}>
+                                                Пока нет комментариев. Будьте первым!
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Отступ внизу */}
+                    <div className="h-8"></div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<SocialApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>
